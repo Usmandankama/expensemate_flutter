@@ -1,6 +1,4 @@
 import 'package:expense_mate_flutter/constatnts/colors.dart';
-import 'package:expense_mate_flutter/controllers/auth_controller.dart';
-import 'package:expense_mate_flutter/controllers/user_controller.dart';
 import 'package:expense_mate_flutter/screens/profile/edit_profile.dart';
 import 'package:expense_mate_flutter/screens/settings/components/settings_tile.dart';
 import 'package:flutter/material.dart';
@@ -15,8 +13,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final AuthController authController = Get.put(AuthController());
-  final UserController userController = Get.put(UserController());
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +45,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     SizedBox(height: 8.h),
                     Text(
-                      userController.userName.value,
+                      // userController.userName.value,
+                      '',
                       style: TextStyle(
                         fontSize: 24.sp,
                         fontWeight: FontWeight.bold,
@@ -57,7 +54,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     Text(
-                      userController.email.value,
+                      // userController.email.value,
+                      "",
                       style: TextStyle(
                         fontSize: 14.sp,
                         color: AppColors.fontLight,
@@ -200,7 +198,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Center(
                 child: TextButton.icon(
                   onPressed: () {
-                    authController.signOut();
                   },
                   icon: Icon(Icons.logout, color: Colors.red),
                   label: Text(
