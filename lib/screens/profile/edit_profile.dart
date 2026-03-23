@@ -1,5 +1,4 @@
 import 'package:expense_mate_flutter/constatnts/colors.dart';
-import 'package:expense_mate_flutter/controllers/user_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -12,7 +11,6 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  final UserController userController = Get.put(UserController());
 
   void _showEditBottomSheet(String title, TextEditingController controller) {
     Get.bottomSheet(
