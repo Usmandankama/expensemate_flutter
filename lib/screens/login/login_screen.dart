@@ -1,5 +1,6 @@
 import 'package:expense_mate_flutter/constatnts/colors.dart';
 import 'package:expense_mate_flutter/screens/components/actionButton.dart';
+import 'package:expense_mate_flutter/screens/home/home_screen.dart';
 import 'package:expense_mate_flutter/screens/home/home_shell.dart';
 import 'package:expense_mate_flutter/screens/login/forgot_password_screen.dart';
 import 'package:expense_mate_flutter/screens/register/register_screen.dart';
@@ -34,25 +35,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> login() async {
-    // if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-    //   Get.snackbar("Error", "Email and password cannot be empty",
-    //       snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
-    //   return;
-    // }
-
-    // isLoading.value = true;
-    // try {
-    //   await authController.loginUser(
-    //     email: emailController.text.trim(),
-    //     password: passwordController.text.trim(),
-    //   );
-    //   Get.offAll(() => const HomeShell()); // Navigate to home on success
-    // } catch (e) {
-    //   Get.snackbar("Login Failed", e.toString(),
-    //       snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
-    // } finally {
-    //   isLoading.value = false;
-    // }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+    );
   }
 
   @override
@@ -113,11 +99,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 SizedBox(height: 30.h),
-                
-                Obx(() => isLoading.value 
-                    ? CircularProgressIndicator(color: AppColors.secondaryColor)
-                    : ActionButton(title: 'Sign in', onPressed: login)),
-                
+
+                Obx(
+                  () => isLoading.value
+                      ? CircularProgressIndicator(
+                          color: AppColors.secondaryColor,
+                        )
+                      : ActionButton(title: 'Sign in', onPressed: login),
+                ),
                 SizedBox(height: 50.h),
                 Text(
                   'or login with',
@@ -138,8 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(16.r),
                       ),
                     ),
-                    onPressed: () {
-                    }, // Google login function (if needed)
+                    onPressed: () {}, // Google login function (if needed)
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
