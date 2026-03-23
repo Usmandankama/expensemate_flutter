@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:http/http.dart' as http;
-import 'package:expense_mate_flutter/secrets/secrets.dart' as secrets;
 
 class ReceiptScannerPage extends StatefulWidget {
   const ReceiptScannerPage({super.key});
@@ -19,101 +18,138 @@ class ReceiptScannerPageState extends State<ReceiptScannerPage> {
   File? _image;
   String _extractedText = "Scan a receipt to extract text";
   String _displayedDetails = "Scan a receipt to extract details";
+  bool _isLoading = false;
 
-  /// Pick an image from Camera or Gallery
+  /// 1. Pick an image from Camera or Gallery
   Future<File?> _pickImage(ImageSource source) async {
-    final pickedFile = await ImagePicker().pickImage(source: source);
+    final pickedFile = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1800,
+      imageQuality: 85,
+    );
     return pickedFile != null ? File(pickedFile.path) : null;
   }
 
-  /// Send extracted text to ChatGPT API
-  // Future<void> _sendToChatGPT(String text) async {
-  //   const String apiKey = secrets.Secrets.chatgptApikey;
-  //   const String apiUrl = "https://api.openai.com/v1/chat/completions";
-
-  //   final response = await http.post(
-  //     Uri.parse(apiUrl),
-  //     headers: {
-  //       "Authorization": "Bearer $apiKey",
-  //       "Content-Type": "application/json"
-  //     },
-  //     body: jsonEncode({
-  //       "model": "gpt-3.5-turbo", 
-  //       "messages": [
-  //         {"role": "system", "content": "You are an AI that extracts and analyzes receipts."},
-  //         {"role": "user", "content": text}
-  //       ]
-  //     }),
-  //   );
-
-  //   if (response.statusCode == 200) {
-  //     final responseData = jsonDecode(response.body);
-  //     String chatGptResponse = responseData["choices"][0]["message"]["content"];
-
-  //     setState(() {
-  //       _displayedDetails += "\n\n🤖 ChatGPT: $chatGptResponse";
-  //     });
-  //   } else {
-  //     setState(() {
-  //       _displayedDetails += "\n\n❌ Failed to get response from ChatGPT.";
-  //     });
-  //   }
-  // }
-// TODO: Make payment for chatgpt api key
-  /// Extract text from the image using ML Kit
-  void _scanReceipt(File image) async {
-    final inputImage = InputImage.fromFile(image);
-    final textRecognizer = TextRecognizer();
-    final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
-    textRecognizer.close();
-
-    String extractedText = recognizedText.text;
-    _image = image;
+  /// 2. Send extracted text to Bun Backend
+  Future<void> _sendToBunBackend(String text) async {
+    // Ensure this matches your computer's IP on the Hotspot
+    const String apiUrl = "http://10.246.248.253:5000/api/expenses";
 
     setState(() {
-      _extractedText = extractedText;
-      _displayedDetails = "Processing receipt...";
+      _isLoading = true;
+      _displayedDetails = "⏳ AI is processing... (5-20s)";
     });
 
-    // Send extracted text to ChatGPT
-    // await _sendToChatGPT(extractedText);
+    try {
+      print("🚀 Requesting: $apiUrl");
+      
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: jsonEncode({"text": text}),
+      ).timeout(const Duration(seconds: 45)); // Longer timeout for Ollama/Phi-3
+
+      print("Status: ${response.statusCode}");
+      
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _displayedDetails = "✅ Success: ${data['message'] ?? 'Items Saved'}";
+        });
+      } else {
+        setState(() {
+          _displayedDetails = "❌ Server Error (${response.statusCode})";
+        });
+        print("Error Body: ${response.body}");
+      }
+    } catch (e) {
+      print("Connection Error: $e");
+      setState(() {
+        _displayedDetails = "❌ Connection Failed. Check Hotspot/Firewall.";
+      });
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
-  /// Show bottom sheet for image selection
+  /// 3. Extract text from the image using ML Kit
+  void _scanReceipt(File image) async {
+    setState(() {
+      _image = image;
+      _displayedDetails = "🔍 Running OCR...";
+    });
+
+    final inputImage = InputImage.fromFile(image);
+    final textRecognizer = TextRecognizer();
+    
+    try {
+      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+      
+      if (recognizedText.text.trim().isEmpty) {
+        setState(() => _displayedDetails = "⚠️ No text found in image.");
+        return;
+      }
+
+      setState(() {
+        _extractedText = recognizedText.text;
+      });
+
+      // Automatically try to send to backend after OCR
+      await _sendToBunBackend(recognizedText.text);
+      
+    } catch (e) {
+      setState(() => _displayedDetails = "❌ OCR Failed: $e");
+    } finally {
+      textRecognizer.close();
+    }
+  }
+
+  /// 4. Retry only the AI/Backend part
+  void _retryAI() {
+    if (_extractedText.isNotEmpty && _extractedText != "Scan a receipt to extract text") {
+      _sendToBunBackend(_extractedText);
+    }
+  }
+
+  /// 5. Show selection dialog
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
       builder: (context) {
         return Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             color: AppColors.accentColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          padding: EdgeInsets.all(16),
-          child: Wrap(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
+              const Text(
+                "Select Receipt Source",
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
               ListTile(
-                leading: Icon(Icons.camera_alt, color: Colors.green),
-                title: Text(
-                  "Take a Picture",
-                  style: TextStyle(color: AppColors.fontWhite),
-                ),
+                leading: const Icon(Icons.camera_alt, color: Colors.greenAccent),
+                title: const Text("Take a Picture", style: TextStyle(color: Colors.white)),
                 onTap: () async {
                   Navigator.pop(context);
-                  File? image = await _pickImage(ImageSource.camera);
-                  if (image != null) _scanReceipt(image);
+                  File? img = await _pickImage(ImageSource.camera);
+                  if (img != null) _scanReceipt(img);
                 },
               ),
               ListTile(
-                leading: Icon(Icons.photo_library, color: Colors.blue),
-                title: Text(
-                  "Choose from Gallery",
-                  style: TextStyle(color: AppColors.fontWhite),
-                ),
+                leading: const Icon(Icons.photo_library, color: Colors.blueAccent),
+                title: const Text("Choose from Gallery", style: TextStyle(color: Colors.white)),
                 onTap: () async {
                   Navigator.pop(context);
-                  File? image = await _pickImage(ImageSource.gallery);
-                  if (image != null) _scanReceipt(image);
+                  File? img = await _pickImage(ImageSource.gallery);
+                  if (img != null) _scanReceipt(img);
                 },
               ),
             ],
@@ -125,59 +161,110 @@ class ReceiptScannerPageState extends State<ReceiptScannerPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool hasText = _extractedText != "Scan a receipt to extract text";
+
     return Scaffold(
       backgroundColor: AppColors.primaryColor,
       appBar: AppBar(
-        title: Text("Scan Receipt"),
+        title: const Text("Receipt Scanner"),
         centerTitle: true,
         backgroundColor: AppColors.accentColor,
-        foregroundColor: AppColors.fontLight,
+        elevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Center(
-          child: Column(
-            children: [
-              _image != null
-                  ? Image.file(_image!, height: 200, fit: BoxFit.cover)
-                  : Icon(Icons.receipt_long, size: 150, color: Colors.grey),
-              SizedBox(height: 16),
-
-              /// Button to scan receipt
-              ActionButton(
-                title: 'Scan Receipt',
-                onPressed: _showImageSourceDialog,
-              ),
-              SizedBox(height: 16),
-
-              /// Highlight key extracted details
-              Container(
-                padding: EdgeInsets.all(12),
+        child: Column(
+          children: [
+            // Image Preview Area
+            Expanded(
+              flex: 2,
+              child: Container(
+                width: double.infinity,
                 decoration: BoxDecoration(
-                  color: AppColors.accentColor,
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppColors.accentColor.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(15),
                 ),
-                child: Text(
-                  _displayedDetails,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppColors.fontLight,
-                    fontWeight: FontWeight.bold,
+                child: _image != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: Image.file(_image!, fit: BoxFit.cover),
+                      )
+                    : const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.receipt_long, size: 80, color: Colors.white24),
+                          SizedBox(height: 10),
+                          Text("No image selected", style: TextStyle(color: Colors.white54)),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Action Buttons Row
+            Row(
+              children: [
+                Expanded(
+                  child: ActionButton(
+                    title: 'Scan New',
+                    onPressed: _isLoading ? () {} : _showImageSourceDialog,
                   ),
                 ),
-              ),
+                if (hasText) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ActionButton(
+                      title: 'Retry AI',
+                      onPressed: _isLoading ? () {} : _retryAI,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
 
-              /// Full extracted text in scrollable area
-              Expanded(
+            // Status/Details Box
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: AppColors.accentColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _isLoading ? Colors.blue : Colors.transparent),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isLoading) const LinearProgressIndicator(backgroundColor: Colors.transparent),
+                  const SizedBox(height: 8),
+                  Text(
+                    _displayedDetails,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Raw Text Scrollable Area
+            Expanded(
+              flex: 1,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.black12,
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: SingleChildScrollView(
                   child: Text(
                     _extractedText,
-                    style: TextStyle(fontSize: 14, color: AppColors.fontLight),
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
