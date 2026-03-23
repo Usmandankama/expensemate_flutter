@@ -4,7 +4,6 @@ import 'package:expense_mate_flutter/screens/login/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import '../../controllers/auth_controller.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,7 +13,6 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final AuthController authController = Get.put(AuthController());
 
   final TextEditingController emailController = TextEditingController();
   final TextEditingController usernameController = TextEditingController();
@@ -29,11 +27,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       isLoading = true; // Start loading
     });
 
-    await authController.registerUser(
-      name: usernameController.text.trim(),
-      email: emailController.text.trim(),
-      password: passwordController.text.trim(),
-    );
+    // await authController.registerUser(
+    //   name: usernameController.text.trim(),
+    //   email: emailController.text.trim(),
+    //   password: passwordController.text.trim(),
+    // );
 
     setState(() {
       isLoading = false; // Stop loading after function completes
