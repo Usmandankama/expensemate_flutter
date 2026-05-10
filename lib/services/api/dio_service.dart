@@ -12,7 +12,8 @@ class DioApiService implements IApiService {
   DioApiService() {
     _dio = Dio(
       BaseOptions(
-        baseUrl: 'http://10.246.248.253:5000/api/',
+        // baseUrl: 'http://10.246.248.253:5000/api/',
+        baseUrl: 'http:/10.0.0.2:3000/api/',
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
         headers: {
