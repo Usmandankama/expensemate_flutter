@@ -1,33 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:expense_mate_flutter/constatnts/colors.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:expense_mate_flutter/controllers/home_controller.dart';
-import 'components/analytics_text.dart';
-import 'components/action_button_container.dart';
+
 
 class HomeScreen extends GetView<HomeController> {
   const HomeScreen({super.key});
 
+  // ── Colour palette ──────────────────────────────────────────────────────────
+  static const _bg = Color(0xFF0F1B2D);
+  static const _card = Color(0xFF1A2B40);
+  static const _blue = Color(0xFF3B82F6);
+  static const _green = Color(0xFF34D399);
+  static const _red = Color(0xFFF87171);
+  static const _purple = Color(0xFFA78BFA);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primaryColor,
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.only(top: 50.h, left: 16.w, right: 16.w),
+      backgroundColor: _bg,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(bottom: 32.h),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              SizedBox(height: 12.h),
               _buildHeader(),
-              SizedBox(height: 30.h),
-              _buildBalanceSection(),
-              SizedBox(height: 40.h),
-              _buildAnalyticsRow(),
-              SizedBox(height: 30.h),
-              _buildActionButtons(),
-              SizedBox(height: 30.h),
-              _buildRecentActivitiesHeader(),
+              SizedBox(height: 18.h),
+              _buildBalanceCard(),
+              SizedBox(height: 16.h),
+              _buildActionRow(),
+              SizedBox(height: 20.h),
+              _buildSectionHeader('Spending trend', trailing: _buildPeriodToggle()),
+              _buildSpendingChart(),
+              SizedBox(height: 20.h),
+              _buildSectionHeader('By category', trailingText: 'See all'),
+              _buildCategoryGrid(),
+              SizedBox(height: 16.h),
+              _buildAiInsightCard(),
+              SizedBox(height: 20.h),
+              _buildSectionHeader('Recent activity', trailingText: 'View all',
+                  onTrailingTap: () => Get.toNamed('/history')),
+              _buildRecentTransactions(),
             ],
           ),
         ),
@@ -35,124 +51,791 @@ class HomeScreen extends GetView<HomeController> {
     );
   }
 
+  // ── Header ──────────────────────────────────────────────────────────────────
+
   Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            const CircleAvatar(
-              backgroundImage: AssetImage('assets/images/avatar.jpeg'),
-            ),
-            SizedBox(width: 12.w),
-            Obx(() => Text(
-              "Hello, ${controller.userName.value}",
-              style: TextStyle(
-                fontFamily: 'Montserrat',
-                fontSize: 18.sp,
-                color: AppColors.fontWhite,
-                fontWeight: FontWeight.w600,
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.w),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              // Avatar
+              Container(
+                width: 38.w,
+                height: 38.w,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [_blue, _purple],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Obx(() => Text(
+                      controller.userName.value.isNotEmpty
+                          ? controller.userName.value[0].toUpperCase()
+                          : '?',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )),
               ),
-            )),
+              SizedBox(width: 12.w),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _greeting(),
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12.sp,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  Obx(() => Text(
+                        controller.userName.value,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Poppins',
+                        ),
+                      )),
+                ],
+              ),
+            ],
+          ),
+          // Notification bell
+          GestureDetector(
+            onTap: () => Get.toNamed('/notifications'),
+            child: Container(
+              width: 38.w,
+              height: 38.w,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.notifications_outlined,
+                  color: Colors.white, size: 20.r),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Balance card ────────────────────────────────────────────────────────────
+
+  Widget _buildBalanceCard() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: Container(
+        padding: EdgeInsets.all(20.w),
+        decoration: BoxDecoration(
+          color: _blue.withOpacity(0.15),
+          border: Border.all(color: _blue.withOpacity(0.25)),
+          borderRadius: BorderRadius.circular(22.r),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'TOTAL BALANCE',
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.8,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            SizedBox(height: 6.h),
+            Obx(() => Text(
+                  'RM ${controller.totalBalance.value.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 32.sp,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Poppins',
+                  ),
+                )),
+            SizedBox(height: 16.h),
+            Row(
+              children: [
+                Expanded(child: _BalancePill(
+                  label: 'Income',
+                  valueObs: controller.totalIncome,
+                  color: _green,
+                  prefix: '+',
+                )),
+                SizedBox(width: 10.w),
+                Expanded(child: _BalancePill(
+                  label: 'Expenses',
+                  valueObs: controller.totalSpent,
+                  color: _red,
+                  prefix: '-',
+                )),
+              ],
+            ),
           ],
         ),
-        const CircleAvatar(
-          backgroundColor: AppColors.accentColor,
-          child: Icon(Icons.notifications, color: AppColors.fontWhite),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBalanceSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Total Balance',
-          style: TextStyle(fontSize: 16.sp, color: AppColors.fontLight),
-        ),
-        Obx(() => Text(
-          '\$${controller.totalBalance.value.toStringAsFixed(0)}',
-          style: TextStyle(
-            fontSize: 32.sp,
-            fontWeight: FontWeight.bold,
-            color: AppColors.fontWhite,
-          ),
-        )),
-      ],
-    );
-  }
-
-  Widget _buildAnalyticsRow() {
-    return Container(
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: AppColors.accentColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16.r),
       ),
+    );
+  }
+
+  // ── Action row (Add Expense | Scan | Add Income) ─────────────────────────
+
+  Widget _buildActionRow() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          Obx(() => AnalyticsText(
-            titleText: 'Spent',
-            amount: controller.totalSpent.value.toInt(),
+          Expanded(child: _ActionButton(
+            label: 'Add Expense',
+            icon: Icons.credit_card_outlined,
+            iconColor: _red,
+            iconBg: _red.withOpacity(0.15),
+            onTap: () => Get.toNamed('/expenses'),
           )),
-          const VerticalDivider(color: AppColors.fontLight),
-          Obx(() => AnalyticsText(
-            titleText: 'Income',
-            amount: controller.totalIncome.value.toInt(),
+          SizedBox(width: 12.w),
+          // Scanner — hero button
+          GestureDetector(
+            onTap: () => Get.toNamed('/scan-receipt'),
+            child: Container(
+              width: 52.w,
+              height: 52.w,
+              decoration: BoxDecoration(
+                color: _blue,
+                borderRadius: BorderRadius.circular(16.r),
+              ),
+              child: Icon(Icons.camera_alt_outlined,
+                  color: Colors.white, size: 24.r),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(child: _ActionButton(
+            label: 'Add Income',
+            icon: Icons.account_balance_wallet_outlined,
+            iconColor: _green,
+            iconBg: _green.withOpacity(0.15),
+            onTap: () => Get.toNamed('/income'),
           )),
         ],
       ),
     );
   }
 
-  Widget _buildActionButtons() {
-    return Row(
-      children: [
-        Expanded(
-          child: ActionButtonContainer(
-            onpressed: () => Get.toNamed('/expenses'),
-            title: 'Add Expense',
-            icon: Icons.credit_card,
-          ),
+  // ── Spending chart ───────────────────────────────────────────────────────
+
+  Widget _buildSpendingChart() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: Container(
+        height: 180.h,
+        padding: EdgeInsets.fromLTRB(8.w, 16.h, 16.w, 8.h),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(18.r),
         ),
-        SizedBox(width: 10.w),
-        Expanded(
-          child: ActionButtonContainer(
-            onpressed: () => Get.toNamed('/income'),
-            title: 'Add Income',
-            icon: Icons.add_card,
-          ),
-        ),
-        SizedBox(width: 10.w),
-        // THE SCANNER TRIGGER
-        GestureDetector(
-          onTap: () => Get.toNamed('/scan-receipt'),
-          child: CircleAvatar(
-            radius: 28.r,
-            backgroundColor: AppColors.accentColor,
-            child: const Icon(Icons.camera_alt, color: Colors.white),
-          ),
-        ),
-      ],
+        child: Obx(() {
+          final spots = controller.weeklySpending
+              .asMap()
+              .entries
+              .map((e) => FlSpot(e.key.toDouble(), e.value))
+              .toList();
+
+          return LineChart(
+            LineChartData(
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: 100,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: Colors.white.withOpacity(0.06),
+                  strokeWidth: 1,
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 42.w,
+                    interval: 100,
+                    getTitlesWidget: (val, _) => Text(
+                      'RM${val.toInt()}',
+                      style: TextStyle(
+                        color: Colors.white30,
+                        fontSize: 9.sp,
+                      ),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (val, _) {
+                      const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+                      final i = val.toInt();
+                      if (i < 0 || i >= days.length) return const SizedBox();
+                      return Text(
+                        days[i],
+                        style: TextStyle(
+                          color: Colors.white30,
+                          fontSize: 10.sp,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: true,
+                  color: _blue,
+                  barWidth: 2.5,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (_, __, ___, ____) =>
+                        FlDotCirclePainter(radius: 3, color: _blue),
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    color: _blue.withOpacity(0.08),
+                  ),
+                ),
+              ],
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor: (_) => const Color(0xFF1E3A5F),
+                  getTooltipItems: (spots) => spots
+                      .map((s) => LineTooltipItem(
+                            'RM ${s.y.toStringAsFixed(0)}',
+                            TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
     );
   }
 
-  Widget _buildRecentActivitiesHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'Recent Activities',
-          style: TextStyle(fontSize: 18.sp, color: AppColors.fontWhite),
+  Widget _buildPeriodToggle() {
+    return Obx(() => Row(
+          children: SpendingPeriod.values.map((p) {
+            final label = p == SpendingPeriod.week ? '7D' : '30D';
+            final isActive = controller.selectedPeriod.value == p;
+            return GestureDetector(
+              onTap: () => controller.setPeriod(p),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                margin: EdgeInsets.only(left: 5.w),
+                padding:
+                    EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: isActive ? _blue : Colors.white.withOpacity(0.07),
+                  borderRadius: BorderRadius.circular(20.r),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: isActive ? Colors.white : Colors.white38,
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ));
+  }
+
+  // ── Category grid ────────────────────────────────────────────────────────
+
+  Widget _buildCategoryGrid() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: Obx(() {
+        final cats = controller.categoryBreakdown;
+        if (cats.isEmpty) {
+          return Center(
+            child: Text('No data yet',
+                style: TextStyle(color: Colors.white30, fontSize: 13.sp)),
+          );
+        }
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 10.w,
+            mainAxisSpacing: 10.h,
+            childAspectRatio: 1.55,
+          ),
+          itemCount: cats.length > 4 ? 4 : cats.length,
+          itemBuilder: (_, i) => _CategoryTile(data: cats[i]),
+        );
+      }),
+    );
+  }
+
+  // ── AI Insight card ──────────────────────────────────────────────────────
+
+  Widget _buildAiInsightCard() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: Container(
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          color: _purple.withOpacity(0.12),
+          border: Border.all(color: _purple.withOpacity(0.25)),
+          borderRadius: BorderRadius.circular(18.r),
         ),
-        TextButton(
-          onPressed: () {},
-          child: const Text('View All', style: TextStyle(color: AppColors.fontLight)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(7.w),
+                  decoration: BoxDecoration(
+                    color: _purple.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Icon(Icons.auto_awesome,
+                      color: _purple, size: 16.r),
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  'AI Insight',
+                  style: TextStyle(
+                    color: _purple,
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10.h),
+            Obx(() {
+              if (controller.isInsightLoading.value) {
+                return Row(
+                  children: [
+                    SizedBox(
+                      width: 14.w,
+                      height: 14.w,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: _purple,
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    Text(
+                      'Analysing your spending…',
+                      style: TextStyle(
+                        color: Colors.white38,
+                        fontSize: 13.sp,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return Text(
+                controller.aiInsight.value.isEmpty
+                    ? 'Tap to generate your spending insight.'
+                    : controller.aiInsight.value,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.82),
+                  fontSize: 13.sp,
+                  height: 1.55,
+                  fontFamily: 'Poppins',
+                ),
+              );
+            }),
+            SizedBox(height: 12.h),
+            GestureDetector(
+              onTap: controller.fetchAiInsight,
+              child: Row(
+                children: [
+                  Icon(Icons.refresh, color: _purple, size: 14.r),
+                  SizedBox(width: 4.w),
+                  Text(
+                    'Refresh insight',
+                    style: TextStyle(
+                      color: _purple,
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  // ── Recent transactions ──────────────────────────────────────────────────
+
+  Widget _buildRecentTransactions() {
+    return Obx(() {
+      final items = controller.recentTransactions.take(5).toList();
+      if (items.isEmpty) {
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+          child: Text('No recent transactions',
+              style: TextStyle(color: Colors.white30, fontSize: 13.sp)),
+        );
+      }
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        child: Column(
+          children: items
+              .map((tx) => _TransactionTile(
+                    name: tx['name'] ?? '',
+                    category: tx['category'] ?? '',
+                    date: tx['date'] ?? '',
+                    amount: (tx['amount'] as num).toDouble(),
+                    icon: tx['icon'] as IconData,
+                    isExpense: tx['isExpense'] as bool? ?? true,
+                  ))
+              .toList(),
+        ),
+      );
+    });
+  }
+
+  // ── Shared section header ────────────────────────────────────────────────
+
+  Widget _buildSectionHeader(
+    String title, {
+    Widget? trailing,
+    String? trailingText,
+    VoidCallback? onTrailingTap,
+  }) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 12.h),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 15.sp,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          if (trailing != null) trailing,
+          if (trailingText != null)
+            GestureDetector(
+              onTap: onTrailingTap,
+              child: Text(
+                trailingText,
+                style: TextStyle(
+                  color: const Color(0xFF3B82F6),
+                  fontSize: 13.sp,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Utility ──────────────────────────────────────────────────────────────
+
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good morning,';
+    if (h < 17) return 'Good afternoon,';
+    return 'Good evening,';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BalancePill extends StatelessWidget {
+  final String label;
+  final RxDouble valueObs;
+  final Color color;
+  final String prefix;
+
+  const _BalancePill({
+    required this.label,
+    required this.valueObs,
+    required this.color,
+    required this.prefix,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: Colors.white38,
+              fontSize: 10.sp,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
+          ),
+          SizedBox(height: 3.h),
+          Obx(() => Text(
+                '$prefix RM ${valueObs.value.toStringAsFixed(2)}',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Poppins',
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.label,
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 12.h),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(14.r),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 36.w,
+              height: 36.w,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(11.r),
+              ),
+              child: Icon(icon, color: iconColor, size: 18.r),
+            ),
+            SizedBox(height: 6.h),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Poppins',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryTile extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _CategoryTile({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = data['color'] as Color? ?? const Color(0xFF3B82F6);
+    final pct = (data['percentage'] as double? ?? 0).clamp(0.0, 1.0);
+
+    return Container(
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(14.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30.w,
+                height: 30.w,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(9.r),
+                ),
+                child: Icon(data['icon'] as IconData? ?? Icons.category,
+                    color: color, size: 16.r),
+              ),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Text(
+                  data['name'] as String? ?? '',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Poppins',
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2.r),
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 4,
+              backgroundColor: Colors.white.withOpacity(0.1),
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+          SizedBox(height: 5.h),
+          Text(
+            'RM ${(data['amount'] as num? ?? 0).toStringAsFixed(0)}',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          Text(
+            '${(pct * 100).toStringAsFixed(0)}% of budget',
+            style: TextStyle(
+              color: Colors.white30,
+              fontSize: 10.sp,
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TransactionTile extends StatelessWidget {
+  final String name;
+  final String category;
+  final String date;
+  final double amount;
+  final IconData icon;
+  final bool isExpense;
+
+  const _TransactionTile({
+    required this.name,
+    required this.category,
+    required this.date,
+    required this.amount,
+    required this.icon,
+    required this.isExpense,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isExpense ? const Color(0xFFF87171) : const Color(0xFF34D399);
+    return Container(
+      margin: EdgeInsets.only(bottom: 8.h),
+      padding: EdgeInsets.symmetric(horizontal: 13.w, vertical: 11.h),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(14.r),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40.w,
+            height: 40.w,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Icon(icon, color: color, size: 18.r),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Poppins',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                SizedBox(height: 2.h),
+                Text('$date · $category',
+                    style: TextStyle(
+                      color: Colors.white30,
+                      fontSize: 11.sp,
+                      fontFamily: 'Poppins',
+                    )),
+              ],
+            ),
+          ),
+          Text(
+            '${isExpense ? '-' : '+'} RM ${amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              color: color,
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
