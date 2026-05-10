@@ -1,4 +1,5 @@
 import 'package:expense_mate_flutter/constatnts/colors.dart';
+import 'package:expense_mate_flutter/controllers/income_controller.dart';
 import 'package:expense_mate_flutter/screens/components/actionButton.dart';
 import 'package:expense_mate_flutter/screens/components/custom_datepicker.dart';
 import 'package:expense_mate_flutter/screens/components/custom_txtfield_2.dart';
@@ -16,6 +17,7 @@ class IncomeScreen extends StatefulWidget {
 }
 
 class _IncomeScreenState extends State<IncomeScreen> {
+  final IncomeController incomeController = Get.find<IncomeController>();
 
   final TextEditingController namecontroller = TextEditingController();
   final TextEditingController amountController = TextEditingController();
@@ -38,14 +40,14 @@ class _IncomeScreenState extends State<IncomeScreen> {
       return;
     }
 
-    // incomeController.addIncome(
-    //   name: namecontroller.text.trim(),
-    //   amount: amount,
-    //   date: DateFormat('yyyy-MM-dd').format(selectedDate),
-    //   description: decriptionController.text.trim(),
-    //   category: selectedCategory,
-    //   iconPath: selectedCategoryIcon, // Default icon, replace if necessary
-    // );
+    incomeController.addIncome(
+      name: namecontroller.text.trim(),
+      amount: amount,
+      date: DateFormat('yyyy-MM-dd').format(selectedDate),
+      description: decriptionController.text.trim(),
+      category: selectedCategory,
+      iconPath: selectedCategoryIcon, // Default icon, replace if necessary
+    );
 
     // Clear input fields after adding
     namecontroller.clear();
