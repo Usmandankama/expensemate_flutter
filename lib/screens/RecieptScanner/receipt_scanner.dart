@@ -2,7 +2,9 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:expense_mate_flutter/constatnts/colors.dart';
 import 'package:expense_mate_flutter/screens/components/actionButton.dart';
+import 'package:expense_mate_flutter/screens/expenses/review_expenses.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:http/http.dart' as http;
@@ -33,7 +35,7 @@ class ReceiptScannerPageState extends State<ReceiptScannerPage> {
   /// 2. Send extracted text to Bun Backend
   Future<void> _sendToBunBackend(String text) async {
     // Ensure this matches your computer's IP on the Hotspot
-    const String apiUrl = "http://10.246.248.253:5000/api/expenses";
+    const String apiUrl = "http://10.0.2.2:3000/api/expenses";
 
     setState(() {
       _isLoading = true;
@@ -42,22 +44,53 @@ class ReceiptScannerPageState extends State<ReceiptScannerPage> {
 
     try {
       print("🚀 Requesting: $apiUrl");
-      
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        body: jsonEncode({"text": text}),
-      ).timeout(const Duration(seconds: 45)); // Longer timeout for Ollama/Phi-3
+
+      final response = await http
+          .post(
+            Uri.parse(apiUrl),
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+            },
+            body: jsonEncode({"text": text}),
+          )
+          .timeout(
+            const Duration(seconds: 45),
+          ); // Longer timeout for Ollama/Phi-3
 
       print("Status: ${response.statusCode}");
-      
+
       if (response.statusCode == 201 || response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final dynamic decodedData = jsonDecode(response.body);
+        List<dynamic> items = [];
+
+        // DEFENSIVE PARSING: Check the shape of the data
+        if (decodedData is List) {
+          // The AI returned a raw array: [ {name: "Milk"}, ... ]
+          items = decodedData;
+        } else if (decodedData is Map<String, dynamic>) {
+          // The AI wrapped it in an object: { "items": [ ... ] }
+          // Grab the array inside the map. If it doesn't exist, fallback to empty list.
+          items = decodedData['items'] ?? decodedData['data'] ?? [decodedData];
+        }
+
         setState(() {
-          _displayedDetails = "✅ Success: ${data['message'] ?? 'Items Saved'}";
+          _displayedDetails = "✅ Processed ${items.length} items";
+
+          if (items.isNotEmpty) {
+            // Format the items into a clean list for the UI
+            _extractedText = items
+                .map((item) {
+                  final name = item['name'] ?? 'Unknown Item';
+                  final category = item['category'] ?? 'Other';
+                  final amount = item['amount']?.toString() ?? '0';
+                  return "• $name ($category): \$$amount";
+                })
+                .join("\n\n");
+                Get.to(() => ReviewExpensesScreen(scannedItems: items));
+          } else {
+            _extractedText = "No items could be extracted.";
+          }
         });
       } else {
         setState(() {
@@ -84,10 +117,12 @@ class ReceiptScannerPageState extends State<ReceiptScannerPage> {
 
     final inputImage = InputImage.fromFile(image);
     final textRecognizer = TextRecognizer();
-    
+
     try {
-      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
-      
+      final RecognizedText recognizedText = await textRecognizer.processImage(
+        inputImage,
+      );
+
       if (recognizedText.text.trim().isEmpty) {
         setState(() => _displayedDetails = "⚠️ No text found in image.");
         return;
@@ -99,7 +134,6 @@ class ReceiptScannerPageState extends State<ReceiptScannerPage> {
 
       // Automatically try to send to backend after OCR
       await _sendToBunBackend(recognizedText.text);
-      
     } catch (e) {
       setState(() => _displayedDetails = "❌ OCR Failed: $e");
     } finally {
@@ -109,7 +143,8 @@ class ReceiptScannerPageState extends State<ReceiptScannerPage> {
 
   /// 4. Retry only the AI/Backend part
   void _retryAI() {
-    if (_extractedText.isNotEmpty && _extractedText != "Scan a receipt to extract text") {
+    if (_extractedText.isNotEmpty &&
+        _extractedText != "Scan a receipt to extract text") {
       _sendToBunBackend(_extractedText);
     }
   }
@@ -131,12 +166,22 @@ class ReceiptScannerPageState extends State<ReceiptScannerPage> {
             children: [
               const Text(
                 "Select Receipt Source",
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 20),
               ListTile(
-                leading: const Icon(Icons.camera_alt, color: Colors.greenAccent),
-                title: const Text("Take a Picture", style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.camera_alt,
+                  color: Colors.greenAccent,
+                ),
+                title: const Text(
+                  "Take a Picture",
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () async {
                   Navigator.pop(context);
                   File? img = await _pickImage(ImageSource.camera);
@@ -144,8 +189,14 @@ class ReceiptScannerPageState extends State<ReceiptScannerPage> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.photo_library, color: Colors.blueAccent),
-                title: const Text("Choose from Gallery", style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.photo_library,
+                  color: Colors.blueAccent,
+                ),
+                title: const Text(
+                  "Choose from Gallery",
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () async {
                   Navigator.pop(context);
                   File? img = await _pickImage(ImageSource.gallery);
@@ -192,9 +243,16 @@ class ReceiptScannerPageState extends State<ReceiptScannerPage> {
                     : const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.receipt_long, size: 80, color: Colors.white24),
+                          Icon(
+                            Icons.receipt_long,
+                            size: 80,
+                            color: Colors.white24,
+                          ),
                           SizedBox(height: 10),
-                          Text("No image selected", style: TextStyle(color: Colors.white54)),
+                          Text(
+                            "No image selected",
+                            style: TextStyle(color: Colors.white54),
+                          ),
                         ],
                       ),
               ),
@@ -230,16 +288,24 @@ class ReceiptScannerPageState extends State<ReceiptScannerPage> {
               decoration: BoxDecoration(
                 color: AppColors.accentColor,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _isLoading ? Colors.blue : Colors.transparent),
+                border: Border.all(
+                  color: _isLoading ? Colors.blue : Colors.transparent,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (_isLoading) const LinearProgressIndicator(backgroundColor: Colors.transparent),
+                  if (_isLoading)
+                    const LinearProgressIndicator(
+                      backgroundColor: Colors.transparent,
+                    ),
                   const SizedBox(height: 8),
                   Text(
                     _displayedDetails,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
