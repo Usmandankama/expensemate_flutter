@@ -1,3 +1,4 @@
+import 'package:expense_mate_flutter/screens/calender/calender_screen.dart';
 import 'package:expense_mate_flutter/screens/settings/settings_screen.dart';
 import 'package:flutter/material.dart';
 import '../../constatnts/colors.dart';
@@ -16,6 +17,7 @@ class _HomeShellState extends State<HomeShell> {
 
   List<Widget> screens = [
     const HomeScreen(),
+    const CalendarScreen(),
     const SettingsScreen(),
   ];
 
