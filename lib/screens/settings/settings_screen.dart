@@ -1,4 +1,5 @@
 import 'package:expense_mate_flutter/constatnts/colors.dart';
+import 'package:expense_mate_flutter/controllers/auth_controller.dart';
 import 'package:expense_mate_flutter/screens/profile/edit_profile.dart';
 import 'package:expense_mate_flutter/screens/settings/components/settings_tile.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final authController = Get.find<AuthController>(); // Assuming you have an AuthController for logout
 
   @override
   Widget build(BuildContext context) {
@@ -198,6 +200,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Center(
                 child: TextButton.icon(
                   onPressed: () {
+                    authController.signOut();
                   },
                   icon: Icon(Icons.logout, color: Colors.red),
                   label: Text(

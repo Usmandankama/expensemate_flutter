@@ -1,4 +1,5 @@
 import 'package:expense_mate_flutter/constatnts/colors.dart';
+import 'package:expense_mate_flutter/controllers/auth_controller.dart';
 import '../components/text_field.dart';
 import 'package:expense_mate_flutter/screens/login/login_screen.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  final authController = Get.find<AuthController>(); // Assuming you have an AuthController for registration
 
   final TextEditingController emailController = TextEditingController();
   final TextEditingController usernameController = TextEditingController();
@@ -27,11 +29,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       isLoading = true; // Start loading
     });
 
-    // await authController.registerUser(
-    //   name: usernameController.text.trim(),
-    //   email: emailController.text.trim(),
-    //   password: passwordController.text.trim(),
-    // );
+    await authController.registerUser(
+      name: usernameController.text.trim(),
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
+    );
 
     setState(() {
       isLoading = false; // Stop loading after function completes

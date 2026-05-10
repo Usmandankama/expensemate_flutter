@@ -35,6 +35,25 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> login() async {
+    // if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+    //   Get.snackbar("Error", "Email and password cannot be empty",
+    //       snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+    //   return;
+    // }
+
+    // isLoading.value = true;
+    // try {
+    //   await authController.loginUser(
+    //     email: emailController.text.trim(),
+    //     password: passwordController.text.trim(),
+    //   );
+    //   Get.offAll(() => const HomeShell()); // Navigate to home on success
+    // } catch (e) {
+    //   Get.snackbar("Login Failed", e.toString(),
+    //       snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+    // } finally {
+    //   isLoading.value = false;
+    // }
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => const HomeScreen()),
