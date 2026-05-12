@@ -2,16 +2,23 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:async';
+import 'theme_controller.dart';
+import 'user_controller.dart';
+import '../widgets/loading_widgets.dart';
 
 enum SpendingPeriod { week, month }
 
 class HomeController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final UserController _userController = Get.find();
+
+  // ── Timer for live updates ───────────────────────────────────────────────────
+  Timer? _refreshTimer;
 
   // ── Core observables ────────────────────────────────────────────────────────
 
-  final RxString userName = ''.obs;
   final RxDouble totalBalance = 0.0.obs;
   final RxDouble totalSpent = 0.0.obs;
   final RxDouble totalIncome = 0.0.obs;
@@ -22,10 +29,38 @@ class HomeController extends GetxController {
   final RxList<double> weeklySpending = <double>[0, 0, 0, 0, 0, 0, 0].obs;
   final Rx<SpendingPeriod> selectedPeriod = SpendingPeriod.week.obs;
 
+  // ── Lifecycle ───────────────────────────────────────────────────────────────
+
+  @override
+  void onInit() {
+    super.onInit();
+    _startLiveUpdates();
+    _loadAll();
+  }
+
+  @override
+  void onClose() {
+    _refreshTimer?.cancel();
+    super.onClose();
+  }
+
+  // ── Live Updates ───────────────────────────────────────────────────────────
+
+  void _startLiveUpdates() {
+    // Refresh data every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _loadAll();
+    });
+  }
+
   // ── Category breakdown ──────────────────────────────────────────────────────
 
   final RxList<Map<String, dynamic>> categoryBreakdown =
       <Map<String, dynamic>>[].obs;
+
+  // ── Goals ───────────────────────────────────────────────────────────────────
+
+  final RxList<Map<String, dynamic>> goals = <Map<String, dynamic>>[].obs;
 
   // ── AI Insight ──────────────────────────────────────────────────────────────
 
@@ -37,23 +72,18 @@ class HomeController extends GetxController {
   final RxList<Map<String, dynamic>> recentTransactions =
       <Map<String, dynamic>>[].obs;
 
+  // ── Chart scaling variables ─────────────────────────────────────────────────
+
+  final RxDouble chartMinValue = 0.0.obs;
+  final RxDouble chartMaxValue = 0.0.obs;
+  final RxDouble chartRange = 0.0.obs;
+
   // ── Internal cache (so period toggle doesn't re-fetch Firebase) ─────────────
 
   List<Map<String, dynamic>> _cachedExpenses = [];
 
   // ── Category colour + icon map ──────────────────────────────────────────────
-  // Keys are lowercase — must match whatever category strings Gemini writes.
-
-  static const Map<String, Color> _categoryColors = {
-    'food': Color(0xFFF87171),
-    'transport': Color(0xFF3B82F6),
-    'entertainment': Color(0xFFA78BFA),
-    'health': Color(0xFFFBBF24),
-    'shopping': Color(0xFFF472B6),
-    'utilities': Color(0xFF34D399),
-    'education': Color(0xFF60A5FA),
-    'other': Color(0xFF94A3B8),
-  };
+  // Now uses ThemeController for consistent theming
 
   static const Map<String, IconData> _categoryIcons = {
     'food': Icons.restaurant_outlined,
@@ -66,22 +96,21 @@ class HomeController extends GetxController {
     'other': Icons.category_outlined,
   };
 
-  Color _colorFor(String cat) =>
-      _categoryColors[cat.toLowerCase()] ?? const Color(0xFF94A3B8);
+  Color _colorFor(String cat) {
+      final themeController = Get.find<ThemeController>();
+      return themeController.getCategoryColor(cat);
+    }
 
   IconData _iconFor(String cat) =>
       _categoryIcons[cat.toLowerCase()] ?? Icons.category_outlined;
 
   // ── Lifecycle ───────────────────────────────────────────────────────────────
 
-  @override
-  void onInit() {
-    super.onInit();
-    _loadAll();
-  }
 
   Future<void> _loadAll() async {
-    await Future.wait([_fetchUserName(), _fetchFinancials()]);
+    // Ensure user credentials are loaded
+    await _userController.refreshUserCredentials();
+    await _fetchFinancials();
     fetchAiInsight();
   }
 
@@ -92,28 +121,6 @@ class HomeController extends GetxController {
   void setPeriod(SpendingPeriod period) {
     selectedPeriod.value = period;
     _buildSpendingChart(); // uses cache — no Firebase call
-  }
-
-  // ── User name ───────────────────────────────────────────────────────────────
-
-  Future<void> _fetchUserName() async {
-    try {
-      final uid = _auth.currentUser?.uid;
-      if (uid == null) return;
-
-      final doc = await _firestore.collection('users').doc(uid).get();
-      final data = doc.data();
-
-      // Adjust 'name' / 'displayName' to match your Firestore user document field
-      userName.value =
-          (data?['name'] ??
-                  data?['displayName'] ??
-                  _auth.currentUser?.displayName ??
-                  'there')
-              as String;
-    } catch (_) {
-      userName.value = _auth.currentUser?.displayName ?? 'there';
-    }
   }
 
   // ── Main financial fetch ────────────────────────────────────────────────────
@@ -150,10 +157,16 @@ class HomeController extends GetxController {
         final data = Map<String, dynamic>.from(doc.data());
         data['id'] = doc.id;
         data['isExpense'] = true;
-        // Reconstruct IconData the same way your ExpenseController does
-        data['icon'] = data['iconPath'] != null
-            ? IconData(int.parse(data['iconPath']), fontFamily: 'MaterialIcons')
-            : _iconFor(data['category'] ?? '');
+        // Reconstruct IconData with error handling
+        if (data['iconPath'] != null) {
+          try {
+            data['icon'] = IconData(int.parse(data['iconPath']), fontFamily: 'MaterialIcons');
+          } catch (e) {
+            data['icon'] = _iconFor(data['category'] ?? ''); // Fallback on parse error
+          }
+        } else {
+          data['icon'] = _iconFor(data['category'] ?? '');
+        }
         return data;
       }).toList();
 
@@ -163,9 +176,16 @@ class HomeController extends GetxController {
         final data = Map<String, dynamic>.from(doc.data());
         data['id'] = doc.id;
         data['isExpense'] = false;
-        data['icon'] = data['iconPath'] != null
-            ? IconData(int.parse(data['iconPath']), fontFamily: 'MaterialIcons')
-            : Icons.account_balance_wallet_outlined;
+        // Reconstruct IconData with error handling
+        if (data['iconPath'] != null) {
+          try {
+            data['icon'] = IconData(int.parse(data['iconPath']), fontFamily: 'MaterialIcons');
+          } catch (e) {
+            data['icon'] = Icons.account_balance_wallet_outlined; // Fallback on parse error
+          }
+        } else {
+          data['icon'] = Icons.account_balance_wallet_outlined;
+        }
         return data;
       }).toList();
 
@@ -247,6 +267,45 @@ class HomeController extends GetxController {
       }
     }
 
+    // Calculate dynamic Y-axis range
+    final nonZeroValues = buckets.where((value) => value > 0);
+    if (nonZeroValues.isNotEmpty) {
+      final minValue = nonZeroValues.reduce((a, b) => a < b ? a : b);
+      final maxValue = nonZeroValues.reduce((a, b) => a > b ? a : b);
+      final range = maxValue - minValue;
+      
+      // Update chart range variables for UI display
+      chartMinValue.value = minValue;
+      chartMaxValue.value = maxValue;
+      chartRange.value = range;
+      
+      // If range is significant, adjust the minimum value to show better detail
+      if (range > minValue * 0.3 && minValue > 10) { // Only adjust if meaningful range and min value
+        // Calculate adjusted minimum to show better detail
+        double adjustedMin;
+        
+        if (range > minValue) {
+          // Large range - use 80% of minimum as baseline
+          adjustedMin = minValue * 0.2;
+        } else {
+          // Moderate range - use 50% of minimum as baseline
+          adjustedMin = minValue * 0.5;
+        }
+        
+        // Adjust bucket values for display
+        for (int i = 0; i < buckets.length; i++) {
+          if (buckets[i] > 0) {
+            buckets[i] = buckets[i] - adjustedMin;
+          }
+        }
+      }
+    } else {
+      // Reset chart range variables when no data
+      chartMinValue.value = 0;
+      chartMaxValue.value = 0;
+      chartRange.value = 0;
+    }
+
     weeklySpending.value = buckets;
   }
 
@@ -282,6 +341,29 @@ class HomeController extends GetxController {
   }
 
   // ── AI Insight ──────────────────────────────────────────────────────────────
+
+  Future<void> fetchGoals() async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return;
+
+      final goalsSnap = await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('goals')
+          .orderBy('createdAt', descending: true)
+          .limit(3) // Only fetch recent goals for preview
+          .get();
+
+      goals.value = goalsSnap.docs.map((doc) {
+        final data = Map<String, dynamic>.from(doc.data());
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching goals: $e');
+    }
+  }
 
   Future<void> fetchAiInsight() async {
     if (isInsightLoading.value) return;
@@ -325,6 +407,14 @@ Data:
     } finally {
       isInsightLoading.value = false;
     }
+  }
+
+  // ── Getters ───────────────────────────────────────────────────────────────────
+
+  String get userName {
+    final name = _userController.userName.value;
+    print("HomeController userName getter called, returning: '$name'");
+    return name.isNotEmpty ? name : "User";
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────

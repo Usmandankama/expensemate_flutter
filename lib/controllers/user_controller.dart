@@ -10,8 +10,8 @@ class UserController extends GetxController {
   RxString email = "".obs;
 
   @override
-  void onReady() {
-    super.onReady();
+  void onInit() {
+    super.onInit();
     getUserCredentials();
   }
 
@@ -22,22 +22,58 @@ class UserController extends GetxController {
         Get.snackbar("Error", "No user is logged in");
         return;
       }
+      
+      // Try to get user document from Firestore
       DocumentSnapshot userDoc =
           await _firestore.collection('users').doc(user.uid).get();
-      if (!userDoc.exists || userDoc.data() == null) {
-        Get.snackbar("Error", "User document not found.");
-        return;
+      
+      String fetchedName = "Unknown";
+      String fetchedEmail = "Unknown";
+      
+      if (userDoc.exists && userDoc.data() != null) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        
+        // Try multiple field names for user name
+        fetchedName = userData['name'] ?? 
+                      userData['displayName'] ?? 
+                      userData['fullName'] ?? 
+                      user.displayName ?? 
+                      user.email?.split('@')[0] ?? 
+                      "User";
+        
+        fetchedEmail = userData['email'] ?? user.email ?? "Unknown";
+      } else {
+        // Fallback to Firebase Auth data if Firestore document doesn't exist
+        fetchedName = user.displayName ?? 
+                      user.email?.split('@')[0] ?? 
+                      "User";
+        fetchedEmail = user.email ?? "Unknown";
       }
-      String fetchedName =
-          (userDoc.data() as Map<String, dynamic>)['name'] ?? "Unknown";
+      
       userName.value = fetchedName;
-
-      String fetchedEmail =
-          (userDoc.data() as Map<String, dynamic>)['email'] ?? "Unknown";
       email.value = fetchedEmail;
+      
+      // Debug print to verify data is being set
+      print("User name set to: $fetchedName");
+      print("User email set to: $fetchedEmail");
+      
     } catch (e) {
-      Get.snackbar("Error", "Failed to fetch user name");
+      print("Error fetching user credentials: $e");
+      // Set fallback values
+      final user = _auth.currentUser;
+      if (user != null) {
+        userName.value = user.displayName ?? user.email?.split('@')[0] ?? "User";
+        email.value = user.email ?? "Unknown";
+      } else {
+        userName.value = "User";
+        email.value = "Unknown";
+      }
     }
+  }
+
+  // Method to manually refresh user credentials
+  Future<void> refreshUserCredentials() async {
+    await getUserCredentials();
   }
 
   //TODO: Get profile picture
