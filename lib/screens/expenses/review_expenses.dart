@@ -137,7 +137,7 @@ class _ReviewExpensesScreenState extends State<ReviewExpensesScreen> {
                   ),
                   SizedBox(height: 10.h),
                   Text(
-                    "\$${totalAmount.toStringAsFixed(2)}", 
+                    " RM ${totalAmount.toStringAsFixed(2)}", 
                     style: TextStyle(color: AppColors.fontWhite, fontSize: 32.sp, fontWeight: FontWeight.bold, fontFamily: 'Montserrat'),
                   ),
                 ],
@@ -201,7 +201,7 @@ class _ReviewExpensesScreenState extends State<ReviewExpensesScreen> {
                                 style: TextStyle(color: Colors.white60, fontSize: 12.sp, fontFamily: 'Montserrat'),
                               ),
                               trailing: Text(
-                                "\$$amount", 
+                                "RM $amount", 
                                 style: TextStyle(color: Colors.greenAccent, fontSize: 16.sp, fontWeight: FontWeight.bold, fontFamily: 'Montserrat'),
                               ),
                             ),

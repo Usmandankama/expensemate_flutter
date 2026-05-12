@@ -167,28 +167,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ],
           ),
-          // Avatar / profile button
-          Container(
-            width: 38.w,
-            height: 38.w,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              'AM',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
+         
         ],
       ),
     );
@@ -292,8 +271,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
               borderRadius: BorderRadius.circular(10.r),
             ),
             // Activity dot
-            markerDecoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.5),
+            markerDecoration: const BoxDecoration(
+              color: Color(0x80FFFFFF),
               shape: BoxShape.circle,
             ),
             markerSize: 4.r,
