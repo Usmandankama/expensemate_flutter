@@ -4,8 +4,11 @@ import 'package:expense_mate_flutter/controllers/auth_controller.dart';
 import 'package:expense_mate_flutter/controllers/expense_controller.dart';
 import 'package:expense_mate_flutter/controllers/home_controller.dart';
 import 'package:expense_mate_flutter/controllers/income_controller.dart';
+import 'package:expense_mate_flutter/controllers/theme_controller.dart';
 import 'package:expense_mate_flutter/controllers/user_controller.dart';
 import 'package:expense_mate_flutter/firebase_options.dart';
+import 'package:expense_mate_flutter/theme/app_theme.dart';
+import 'package:expense_mate_flutter/utils/animation_utils.dart';
 import 'package:expense_mate_flutter/screens/RecieptScanner/receipt_scanner.dart';
 import 'package:expense_mate_flutter/screens/expenses/expense_screen.dart';
 import 'package:expense_mate_flutter/screens/home/home_screen.dart';
@@ -31,6 +34,7 @@ Future<void> main() async {
   Get.put(IncomeController());
   Get.put(ExpenseController());
   Get.put(HomeController());
+  Get.put(ThemeController());
   runApp(const MyApp());
 }
 
@@ -44,12 +48,25 @@ class MyApp extends StatelessWidget {
       builder: (_, _) {
         return GetMaterialApp(
           initialRoute: "/",
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeController.to.themeMode,
+          defaultTransition: Transition.rightToLeft,
+          transitionDuration: AppAnimations.medium,
           getPages: [
-            // Home Route
+            // Home Shell Route (main navigation)
             GetPage(
               name: '/',
+              page: () => const HomeShell(),
+              transition: Transition.fadeIn,
+              transitionDuration: AppAnimations.slow,
+            ),
+            // Home Screen Route (dashboard content)
+            GetPage(
+              name: '/home',
               page: () => const HomeScreen(),
               binding: HomeBinding(),
+              transition: Transition.rightToLeft,
             ),
             // Receipt Scanner Route
             GetPage(
@@ -57,28 +74,46 @@ class MyApp extends StatelessWidget {
               page: () => const ReceiptScannerPage(),
               binding:
                   ReceiptBinding(), // This injects your OCR & Backend services!
+              transition: Transition.upToDown,
+              transitionDuration: AppAnimations.medium,
             ),
-            GetPage(name: "/login", page: () => const LoginScreen()),
-            GetPage(name: "/register", page: () => const RegisterScreen()),
-            GetPage(name: "/expenses", page: () => const ExpenseScreen()),
-            GetPage(name: "/income", page: () => const IncomeScreen()),
+            GetPage(
+              name: "/login", 
+              page: () => const LoginScreen(),
+              transition: Transition.fadeIn,
+              transitionDuration: AppAnimations.medium,
+            ),
+            GetPage(
+              name: "/register", 
+              page: () => const RegisterScreen(),
+              transition: Transition.rightToLeft,
+            ),
+            GetPage(
+              name: "/expenses", 
+              page: () => const ExpenseScreen(),
+              transition: Transition.rightToLeft,
+            ),
+            GetPage(
+              name: "/income", 
+              page: () => const IncomeScreen(),
+              transition: Transition.rightToLeft,
+            ),
           ],
           debugShowCheckedModeBanner: false,
-          home: _decideStartingScreen(),
         );
       },
     );
   }
 
-  Widget _decideStartingScreen() {
-    final box = GetStorage();
-    bool isFirstTime = box.read("isFirstTime") ?? true; // Default is true
+  // Widget _decideStartingScreen() {
+  //   final box = GetStorage();
+  //   bool isFirstTime = box.read("isFirstTime") ?? true; // Default is true
 
-    if (isFirstTime) {
-      box.write("isFirstTime", false);
-      return const SplashTimer();
-    } else {
-      return const HomeShell();
-    }
-  }
+  //   if (isFirstTime) {
+  //     box.write("isFirstTime", false);
+  //     return const SplashTimer();
+  //   } else {
+  //     return const HomeShell();
+  //   }
+  // }
 }
